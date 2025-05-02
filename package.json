@@ -1,0 +1,15 @@
+{
+  "name": "com.humana-machina.windows-ipc",
+  "version": "1.0.0",
+  "displayName": "Windows IPC",
+  "description": "Windows NamedPipes for interprocess communication",
+  "unity": "2022.3",
+  "dependencies": {},
+  "samples": [
+    {
+      "displayName": "Demos",
+      "description": "Showcases features provided by Windows IPC",
+      "path": "Samples~/Demos"
+    }
+  ]
+}
