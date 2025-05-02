@@ -972,8 +972,8 @@ MonoBehaviour:
   sendDataButton: {fileID: 526839592}
   showWindowButton: {fileID: 383649436}
   hideWindowButton: {fileID: 460104600}
-  launchProcess: 0
-  processToLaunch: 
+  launchProcess: 1
+  processToLaunch: D:/Projects/humana-machina/HM Proxy/Build/HM Proxy.exe
 --- !u!4 &817419496
 Transform:
   m_ObjectHideFlags: 0
