@@ -2,14 +2,16 @@ using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(MergePlotProxy))]
-public class DemoClientIPCEditor : Editor
+public class MergePlotProxyEditor : Editor
 {
     SerializedProperty _processProp;
+    SerializedProperty _launchProp;
 
     //-----------------------------------------------------------------------------
     void OnEnable()
     {
         _processProp = serializedObject.FindProperty("processToLaunch");
+        _launchProp = serializedObject.FindProperty("launchProcess");
     }
 
     //-----------------------------------------------------------------------------
@@ -21,7 +23,7 @@ public class DemoClientIPCEditor : Editor
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("HM Proxy Executable", EditorStyles.boldLabel);
-
+        EditorGUILayout.PropertyField(_launchProp, new GUIContent("Launch On Start"));
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.PropertyField(_processProp, new GUIContent("Process To Launch"));
 
@@ -39,5 +41,4 @@ public class DemoClientIPCEditor : Editor
 
         serializedObject.ApplyModifiedProperties();
     }
-
 }

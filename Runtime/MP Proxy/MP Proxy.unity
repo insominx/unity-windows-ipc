@@ -975,7 +975,7 @@ MonoBehaviour:
   launchProcess: 1
   processToLaunch: D:/Projects/humana-machina/HM Proxy/Build/HM Proxy.exe
   logHeartbeats: 1
-  logReceivedData: 0
+  logReceivedData: 1
 --- !u!4 &817419496
 Transform:
   m_ObjectHideFlags: 0

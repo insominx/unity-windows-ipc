@@ -8,10 +8,6 @@ using Debug = UnityEngine.Debug;
 using UnityEditor; // Editor file picker
 #endif
 
-#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
-using System.Windows.Forms; // Runtime file picker (Mono backend)
-#endif
-
 public class MergePlotProxy : MonoBehaviour
 {
     [Header("References")]
@@ -20,7 +16,7 @@ public class MergePlotProxy : MonoBehaviour
     public Button showWindowButton;
     public Button hideWindowButton;
 
-    [Header("Config")]
+    // Handled by custom editor
     public bool launchProcess;
     public string processToLaunch;
 
@@ -98,30 +94,12 @@ public class MergePlotProxy : MonoBehaviour
         pipe?.Send(showJSON);
     }
 
+    //---------------------------------------------------------------------------
     void SendHideWindowCommand()
     {
         string showJSON = JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "false" });
         Debug.Log($"Sending: {showJSON}");
         pipe?.Send(showJSON);
-    }
-
-    //---------------------------------------------------------------------------
-    void BrowseForExe()
-    {
-        string path = string.Empty;
-
-#if UNITY_EDITOR
-        path = EditorUtility.OpenFilePanel("Select executable", "", "exe");
-#elif UNITY_STANDALONE_WIN
-        using (var dlg = new OpenFileDialog { Filter = "Executable (*.exe)|*.exe" })
-            if (dlg.ShowDialog() == DialogResult.OK)
-                path = dlg.FileName;
-#endif
-
-        if (string.IsNullOrWhiteSpace(path)) return;
-
-        processToLaunch = path;
-        StartProcess(path);
     }
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN

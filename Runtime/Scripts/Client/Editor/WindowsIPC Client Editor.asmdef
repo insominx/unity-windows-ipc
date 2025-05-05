@@ -1,11 +1,11 @@
 {
-    "name": "WindowsIPC",
+    "name": "WindowsIPCClientEditor",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:66283559dcfa278419e02e5dad948494"
+    ],
     "includePlatforms": [
-        "Editor",
-        "WindowsStandalone32",
-        "WindowsStandalone64"
+        "Editor"
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
