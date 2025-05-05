@@ -1,5 +1,6 @@
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;                    // ★ NEW
 using System.IO;
@@ -19,20 +20,21 @@ using Debug = UnityEngine.Debug;
 /// </summary>
 public sealed class NamedPipeClientIPC : MonoBehaviour
 {
-    // ─────────────── Inspector values ───────────────
     [Header("Pipe Settings")]
-    [SerializeField] string pipeName           = "UnityPipe";
-    [SerializeField] int    connectTimeoutMs   = 1000;   // 1 s
-    [SerializeField] float  reconnectDelaySecs = 0.5f;   // retry back-off
-    [SerializeField] float  heartbeatInterval  = 1.0f;   // seconds
+    [SerializeField] string pipeName          = "UnityPipe";
+    [SerializeField] int connectTimeoutMs     = 1000;   // 1 s
+    [SerializeField] float reconnectDelaySecs = 0.5f;   // retry back-off
+    [SerializeField] float heartbeatInterval  = 1.0f;   // seconds
 
-    // ─────────────── Runtime state ───────────────
+    public delegate void DataReceived(string newData);
+    public static event DataReceived OnDataReceived;
+
     readonly ConcurrentQueue<string> sendQueue = new(); // thread-safe
     CancellationTokenSource cancelSrc;
-    SynchronizationContext  unityCtx;
-    Task                    loopTask;
-    int                     shutdownFlag;               // 0 = running, 1 = shutting down
-    volatile int            connectedFlag;              // 0 = not connected, 1 = connected
+    SynchronizationContext unityCtx;
+    Task loopTask;
+    int shutdownFlag;           // 0 = running, 1 = shutting down
+    volatile int connectedFlag; // 0 = not connected, 1 = connected
 
     const int MaxPayloadBytes = 4096;                   // hard limit
 
@@ -45,12 +47,12 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
     }
 
     void OnApplicationQuit() => Shutdown();
-    void OnDestroy()         => Shutdown();
+    void OnDestroy() => Shutdown();
 
     // ─────────────── Public API ───────────────
     public bool Send(string message)
     {
-        if (connectedFlag == 0)                 // gate on live connection
+        if (connectedFlag == 0) // gate on live connection
             return false;
 
         if (string.IsNullOrEmpty(message))
@@ -87,8 +89,7 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
     {
         while (!token.IsCancellationRequested)
         {
-            using var client = new NamedPipeClientStream(
-                ".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            using var client = new NamedPipeClientStream( ".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
             using var reg = token.Register(() => { try { client.Dispose(); } catch { } });
 
             try
@@ -125,32 +126,43 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
     // ─────────────── Reader (message mode) ───────────────
     async Task ReaderLoopAsync(PipeStream pipe, CancellationToken token)
     {
-        using var reg = token.Register(() => { try { pipe.Dispose(); } catch { } });
-        byte[] buf = new byte[MaxPayloadBytes];
+        using var reg = token.Register(() => {
+            try { pipe.Dispose(); }
+            catch { /* ignore */ }
+        });
+
+        const int ChunkSize = 8192;
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(ChunkSize);
+        using var ms = new MemoryStream(ChunkSize);
 
         try
         {
             while (!token.IsCancellationRequested && pipe.IsConnected)
             {
-                int total = 0;
+                ms.SetLength(0);
+
+                // read till end-of-message
                 do
                 {
-                    int n = await pipe.ReadAsync(buf, total, buf.Length - total, token).ConfigureAwait(false);
-                    if (n == 0) return;          // server closed
-                    total += n;
+                    int n = await pipe.ReadAsync(buffer, 0, ChunkSize, token) .ConfigureAwait(false);
+                    if (n == 0) return; // remote closed
+
+                    ms.Write(buffer, 0, n);
                 }
                 while (!pipe.IsMessageComplete);
 
-                string payload = Encoding.UTF8.GetString(buf, 0, total);
-                if (payload.StartsWith("HEARTBEAT"))
-                    Log($"Received {payload}");
-                else
-                    Log($"Received: {payload}");
+                // get the raw backing array (no copy!) and decode only the bytes we wrote
+                string payload = Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+                RaiseDataReceived(payload);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) { /* expected on cancel */ }
         catch (IOException ioEx)           { Log($"Pipe read ended: {ioEx.Message}"); }
-        catch (Exception ex)               { LogErr("Reader: " + ex); }
+        catch (Exception ex)               { LogErr($"ReaderLoop failed: {ex}"); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     // ─────────────── Writer (queue + heart-beat) ───────────────
@@ -192,8 +204,26 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
         catch (Exception ex)               { LogErr("Writer: " + ex); }
     }
 
+    // ─────────────── Data Relay ───────────────
+    void RaiseDataReceived(string data)
+    {
+        if (OnDataReceived == null) return;
+        Debug.Log(data);
+
+        void InvokeEvent()
+        {
+            try { OnDataReceived?.Invoke(data); }
+            catch (Exception ex) { Debug.LogException(ex); }
+        }
+
+        if (unityCtx != null)
+            unityCtx.Post(_ => InvokeEvent(), null);
+        else
+            InvokeEvent();
+    }
+
     // ─────────────── Thread-safe logging ───────────────
-    void Log   (string m) => Post(_ => { if (Application.isPlaying) Debug.Log   (m); });
+    void Log(string m) => Post(_ => { if (Application.isPlaying) Debug.Log   (m); });
     void LogErr(string m) => Post(_ => { if (Application.isPlaying) Debug.LogError(m); });
 
     void Post(SendOrPostCallback cb)

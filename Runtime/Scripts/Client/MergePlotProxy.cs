@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Diagnostics;
@@ -6,14 +5,14 @@ using System.IO;
 using Debug = UnityEngine.Debug;
 
 #if UNITY_EDITOR
-using UnityEditor;                       // Editor file picker
+using UnityEditor; // Editor file picker
 #endif
 
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
-using System.Windows.Forms;              // Runtime file picker (Mono backend)
+using System.Windows.Forms; // Runtime file picker (Mono backend)
 #endif
 
-public class DemoClientIPC : MonoBehaviour
+public class MergePlotProxy : MonoBehaviour
 {
     [Header("References")]
     public NamedPipeClientIPC pipe;
@@ -25,16 +24,23 @@ public class DemoClientIPC : MonoBehaviour
     public bool launchProcess;
     public string processToLaunch;
 
+    [Header("Debug")]
+    public bool logHeartbeats;
+    public bool logReceivedData;
+
+    //---------------------------------------------------------------------------
     void Start()
     {
         sendDataButton.onClick.AddListener(SendSampleData);
         showWindowButton.onClick.AddListener(SendShowWindowCommand);
         hideWindowButton.onClick.AddListener(SendHideWindowCommand);
 
+        NamedPipeClientIPC.OnDataReceived += OnMessageReceived;
         if (!launchProcess || string.IsNullOrWhiteSpace(processToLaunch)) return;
         StartProcess(processToLaunch);
     }
 
+    //---------------------------------------------------------------------------
     void OnDestroy()
     {
         sendDataButton.onClick.RemoveListener(SendSampleData);
@@ -42,18 +48,49 @@ public class DemoClientIPC : MonoBehaviour
         hideWindowButton.onClick.RemoveListener(SendHideWindowCommand);
     }
 
+    //---------------------------------------------------------------------------
     void OnValidate()
     {
         if (!pipe)
             Debug.LogWarning("No pipe assigned");
     }
 
+    //---------------------------------------------------------------------------
+    void OnMessageReceived(string newData)
+    {
+        try
+        {
+            var msg = JsonUtility.FromJson<MessageIPC>(newData);
+            if (msg != null)
+                ProcessMessage(msg);
+        }
+        catch {}
+    }
+
+    //---------------------------------------------------------------------------
+    void ProcessMessage(MessageIPC msg)
+    {
+        if (msg == null) return;
+
+        if (msg.type == "heartbeat")
+        {
+            if (logHeartbeats)
+                Debug.Log(JsonUtility.ToJson(msg));
+            return;
+        }
+
+        if (logReceivedData)
+            Debug.Log(JsonUtility.ToJson(msg));
+    }
+
+    //---------------------------------------------------------------------------
     void SendSampleData()
     {
         string customJSON = JsonUtility.ToJson(new MessageIPC { type = "custom", value = "true" });
         pipe?.Send(customJSON);
     }
 
+    //---------------------------------------------------------------------------
     void SendShowWindowCommand()
     {
         string showJSON = JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "true" });
@@ -68,6 +105,7 @@ public class DemoClientIPC : MonoBehaviour
         pipe?.Send(showJSON);
     }
 
+    //---------------------------------------------------------------------------
     void BrowseForExe()
     {
         string path = string.Empty;
@@ -87,6 +125,7 @@ public class DemoClientIPC : MonoBehaviour
     }
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+    //---------------------------------------------------------------------------
     static void StartProcess(string exePath, string arguments = "")
     {
         if (string.IsNullOrWhiteSpace(exePath)) return;

@@ -1,36 +1,35 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-public class HMProxy : MonoBehaviour
+public class HumanaMachinaProxy : MonoBehaviour
 {
     [Header("References")]
     public Button hideWindowButton;
 
     [Header("Config")]
-    public bool logHeartbeats;
-    public bool logReceivedData;
+    WindowController _windowCtrl;
 
     [Header("Debug")]
-    WindowController _windowCtrl;
+    public bool logHeartbeats;
+    public bool logReceivedData;
 
     //---------------------------------------------------------------------------
     void Awake()
     {
         _windowCtrl = new WindowController();
         hideWindowButton.onClick.AddListener(OnHideWindowClicked);
-
-        NamedPipeServerIPC.OnDataReceived += NamedPipeServerIPCOnOnDataReceived;
+        NamedPipeServerIPC.OnDataReceived += OnMessageReceived;
     }
 
     //---------------------------------------------------------------------------
     void OnDestroy()
     {
         hideWindowButton.onClick.RemoveListener(OnHideWindowClicked);
-        NamedPipeServerIPC.OnDataReceived -= NamedPipeServerIPCOnOnDataReceived;
+        NamedPipeServerIPC.OnDataReceived -= OnMessageReceived;
     }
 
     //---------------------------------------------------------------------------
-    void NamedPipeServerIPCOnOnDataReceived(string newData)
+    void OnMessageReceived(string newData)
     {
         try
         {
