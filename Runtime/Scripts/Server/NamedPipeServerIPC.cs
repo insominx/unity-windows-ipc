@@ -43,7 +43,8 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
     {
         if (Interlocked.Exchange(ref shutdownFlag, 1) != 0) return;
         try { cancelSource?.Cancel(); }
-        catch { }
+        catch { /* ignored */ }
+
         if (pipeTask != null) _ = pipeTask.ContinueWith(_ => { }, TaskScheduler.Default);
         cancelSource?.Dispose();
         cancelSource = null;
@@ -54,17 +55,17 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
     {
         while (!token.IsCancellationRequested)
         {
-            using var server = new NamedPipeServerStream(
+            await using var server = new NamedPipeServerStream(
                 pipeName,
                 PipeDirection.InOut,
                 1,
                 PipeTransmissionMode.Message,
                 PipeOptions.Asynchronous);
 
-            using var _ = token.Register(() =>
+            await using var _ = token.Register(() =>
             {
                 try { server.Dispose(); }
-                catch { }
+                catch { /* ignored */ }
             });
 
             Log("Waiting for named pipe client to connect…");
@@ -86,7 +87,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
 
             await Task.WhenAny(readerTask, writerTask).ConfigureAwait(false);
             try { await Task.WhenAll(readerTask, writerTask).ConfigureAwait(false); }
-            catch { }
+            catch { /* ignored */}
 
             Log("Named pipe connection closed.");
         }
@@ -96,11 +97,12 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
     //---------------------------------------------------------------------------
     async Task PipeReaderLoop(PipeStream pipe, CancellationToken token)
     {
-        using var reg = token.Register(() =>
+        await using var reg = token.Register(() =>
         {
             try { pipe.Dispose(); }
-            catch { }
+            catch { /* ignored */ }
         });
+
         byte[] buffer = ArrayPool<byte>.Shared.Rent(MaxPayloadBytes);
 
         try
@@ -110,8 +112,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
                 int total = 0;
                 do
                 {
-                    int n = await pipe.ReadAsync(buffer, total, buffer.Length - total, token)
-                        .ConfigureAwait(false);
+                    int n = await pipe.ReadAsync(buffer, total, buffer.Length - total, token) .ConfigureAwait(false);
                     if (n == 0) return;
                     total += n;
                 }
@@ -125,10 +126,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         catch (OperationCanceledException) { }
         catch (IOException ioEx) { Log($"Pipe read ended: {ioEx.Message}"); }
         catch (Exception ex) { LogError("Unexpected error in pipe reader: " + ex); }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
     }
 
     //---------------------------------------------------------------------------

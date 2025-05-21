@@ -15,7 +15,8 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
 
     protected const int MaxPayloadBytes = 4096;
     protected readonly ConcurrentQueue<string> sendQueue = new();
-    protected SynchronizationContext unityContext;
+
+    SynchronizationContext unityContext;
 
     //---------------------------------------------------------------------------
     protected virtual void Awake()
@@ -59,20 +60,19 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     }
 
     //---------------------------------------------------------------------------
-    protected void Post(SendOrPostCallback cb)
+    protected virtual void Log(string msg) =>
+        Post(_ => { if (Application.isPlaying) Debug.Log(msg); });
+
+    //---------------------------------------------------------------------------
+    protected virtual void LogError(string msg) =>
+        Post(_ => { if (Application.isPlaying) Debug.LogError(msg); });
+
+    //---------------------------------------------------------------------------
+    void Post(SendOrPostCallback cb)
     {
         if (unityContext != null)
             unityContext.Post(cb, null);
         else
             cb(null);
     }
-
-    //---------------------------------------------------------------------------
-    protected virtual void Log(string msg) =>
-        Post(_ => { if (Application.isPlaying) Debug.Log(msg); });
-
-
-    //---------------------------------------------------------------------------
-    protected virtual void LogError(string msg) =>
-        Post(_ => { if (Application.isPlaying) Debug.LogError(msg); });
 }
