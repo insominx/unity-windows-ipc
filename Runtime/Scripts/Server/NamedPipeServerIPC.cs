@@ -4,10 +4,9 @@ using System.IO.Pipes;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent; // ★ added
 using UnityEngine;
 
-public class NamedPipeServerIPC : MonoBehaviour
+public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
 {
     [Header("Named Pipe Settings")]
     [Tooltip("Name of the pipe to create/connect to.")]
@@ -19,34 +18,18 @@ public class NamedPipeServerIPC : MonoBehaviour
     [Header("Config")]
     public bool verbose;
 
-    public delegate void DataReceived(string newData);
-    public static event DataReceived OnDataReceived;
-
-    const int MaxPayloadBytes = 4096;
-
     CancellationTokenSource cancelSource;
-    SynchronizationContext unityContext;
     Task pipeTask;
     int shutdownFlag;
-
-    readonly ConcurrentQueue<string> sendQueue = new(); // ★ added
 
     public bool Send(string message) // ★ added
     {
         if (string.IsNullOrEmpty(message)) return true;
-        int bytes = Encoding.UTF8.GetByteCount(message);
-        if (bytes > MaxPayloadBytes)
-        {
-            LogError($"IPC Send rejected – payload {bytes} B exceeds 4 KB limit.");
-            return false;
-        }
-        sendQueue.Enqueue(message);
-        return true;
+        return EnqueueMessage(message);
     }
 
     void Start()
     {
-        unityContext = SynchronizationContext.Current;
         cancelSource = new CancellationTokenSource();
         pipeTask = Task.Run(() => RunPipeServerAsync(cancelSource.Token));
     }
@@ -179,44 +162,14 @@ public class NamedPipeServerIPC : MonoBehaviour
     }
 
 
-    void RaiseDataReceived(string data)
-    {
-        if (OnDataReceived == null) return;
-        Debug.Log(data);
-
-        void InvokeEvent()
-        {
-            try { OnDataReceived?.Invoke(data); }
-            catch (Exception ex) { Debug.LogException(ex); }
-        }
-
-        if (unityContext != null)
-            unityContext.Post(_ => InvokeEvent(), null);
-        else
-            InvokeEvent();
-    }
-
-    void Log(string msg)
+    protected override void Log(string msg)
     {
         if (!verbose) return;
-        if (unityContext != null)
-            unityContext.Post(_ =>
-            {
-                if (Application.isPlaying) Debug.Log(msg);
-            }, null);
-        else
-            Debug.Log(msg);
+        base.Log(msg);
     }
 
-    void LogError(string msg)
+    protected override void LogError(string msg)
     {
-        if (unityContext != null)
-            unityContext.Post(_ =>
-            {
-                if (Application.isPlaying)
-                    Debug.LogError(msg);
-            }, null);
-        else
-            Debug.LogError(msg);
+        base.LogError(msg);
     }
 }
