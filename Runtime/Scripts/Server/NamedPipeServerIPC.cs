@@ -135,7 +135,8 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
     async Task PipeWriterLoop(PipeStream pipe, CancellationToken token)
     {
         // The writer now owns the pipe until the outer "using var server" in RunPipeServerAsync disposes it.
-        using var writer = new StreamWriter(pipe, Encoding.UTF8, 1024) { AutoFlush = true };
+        await using var writer = new StreamWriter(pipe, Encoding.UTF8, 1024, leaveOpen: true);
+        writer.AutoFlush = true;
 
         DateTime nextHeartbeat = DateTime.UtcNow.AddSeconds(heartbeatInterval);
         MessageIPC heartBeatMsg = new() { type = "heartbeat" };
