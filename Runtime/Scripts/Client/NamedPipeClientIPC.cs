@@ -1,7 +1,6 @@
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Diagnostics;                    // ★ NEW
 using System.IO;
 using System.IO.Pipes;
@@ -18,7 +17,7 @@ using Debug = UnityEngine.Debug;
 /// • never touches Unity API off the main thread
 /// • shuts down cleanly with no leaked tasks
 /// </summary>
-public sealed class NamedPipeClientIPC : MonoBehaviour
+public sealed class NamedPipeClientIPC : NamedPipeIPCBase<NamedPipeClientIPC>
 {
     [Header("Pipe Settings")]
     [SerializeField] string pipeName          = "UnityPipe";
@@ -26,22 +25,14 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
     [SerializeField] float reconnectDelaySecs = 0.5f;   // retry back-off
     [SerializeField] float heartbeatInterval  = 1.0f;   // seconds
 
-    public delegate void DataReceived(string newData);
-    public static event DataReceived OnDataReceived;
-
-    readonly ConcurrentQueue<string> sendQueue = new(); // thread-safe
     CancellationTokenSource cancelSrc;
-    SynchronizationContext unityCtx;
     Task loopTask;
     int shutdownFlag;           // 0 = running, 1 = shutting down
     volatile int connectedFlag; // 0 = not connected, 1 = connected
 
-    const int MaxPayloadBytes = 4096;                   // hard limit
-
     // ─────────────── Unity lifecycle ───────────────
     void Start()
     {
-        unityCtx  = SynchronizationContext.Current;
         cancelSrc = new CancellationTokenSource();
         loopTask  = Task.Run(() => ClientLoopAsync(cancelSrc.Token)); // background loop
     }
@@ -55,18 +46,7 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
         if (connectedFlag == 0) // gate on live connection
             return false;
 
-        if (string.IsNullOrEmpty(message))
-            return true;
-
-        int bytes = Encoding.UTF8.GetByteCount(message);
-        if (bytes > MaxPayloadBytes)
-        {
-            LogErr($"IPC Send rejected – payload {bytes} B exceeds 4 KB limit.");
-            return false;
-        }
-
-        sendQueue.Enqueue(message);
-        return true;
+        return EnqueueMessage(message);
     }
 
     // ─────────────── Graceful shutdown ───────────────
@@ -108,7 +88,7 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
             catch (TimeoutException)           { }
             catch (OperationCanceledException) { break; }
             catch (IOException ioEx)           { Log($"Pipe I/O closed: {ioEx.Message}"); }
-            catch (Exception ex)               { LogErr("Client error: " + ex); }
+            catch (Exception ex)               { LogError("Client error: " + ex); }
             finally
             {
                 connectedFlag = 0;
@@ -158,7 +138,7 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
         }
         catch (OperationCanceledException) { /* expected on cancel */ }
         catch (IOException ioEx)           { Log($"Pipe read ended: {ioEx.Message}"); }
-        catch (Exception ex)               { LogErr($"ReaderLoop failed: {ex}"); }
+        catch (Exception ex)               { LogError($"ReaderLoop failed: {ex}"); }
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
@@ -202,37 +182,12 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
         }
         catch (OperationCanceledException) { }
         catch (IOException)                { }
-        catch (Exception ex)               { LogErr("Writer: " + ex); }
+        catch (Exception ex)               { LogError("Writer: " + ex); }
     }
 
     // ─────────────── Data Relay ───────────────
-    void RaiseDataReceived(string data)
-    {
-        if (OnDataReceived == null) return;
-        Debug.Log(data);
-
-        void InvokeEvent()
-        {
-            try { OnDataReceived?.Invoke(data); }
-            catch (Exception ex) { Debug.LogException(ex); }
-        }
-
-        if (unityCtx != null)
-            unityCtx.Post(_ => InvokeEvent(), null);
-        else
-            InvokeEvent();
-    }
-
     // ─────────────── Thread-safe logging ───────────────
-    void Log(string m) => Post(_ => { if (Application.isPlaying) Debug.Log   (m); });
-    void LogErr(string m) => Post(_ => { if (Application.isPlaying) Debug.LogError(m); });
+    // Logging handled by base class
 
-    void Post(SendOrPostCallback cb)
-    {
-        if (unityCtx != null)
-            unityCtx.Post(cb, null);
-        else
-            cb(null);
-    }
 }
 #endif
