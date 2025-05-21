@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent; // ★ added
+using System.Buffers;                // ★ new
 using UnityEngine;
 
 public class NamedPipeServerIPC : MonoBehaviour
@@ -114,7 +115,7 @@ public class NamedPipeServerIPC : MonoBehaviour
             try { pipe.Dispose(); }
             catch { }
         });
-        byte[] buffer = new byte[MaxPayloadBytes];
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(MaxPayloadBytes);
 
         try
         {
@@ -138,6 +139,10 @@ public class NamedPipeServerIPC : MonoBehaviour
         catch (OperationCanceledException) { }
         catch (IOException ioEx) { Log($"Pipe read ended: {ioEx.Message}"); }
         catch (Exception ex) { LogError("Unexpected error in pipe reader: " + ex); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     async Task PipeWriterLoop(PipeStream pipe, CancellationToken token)

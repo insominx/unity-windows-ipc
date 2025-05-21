@@ -173,6 +173,7 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
 
         var stopwatch     = Stopwatch.StartNew();      // ★ thread-safe timer
         double nextBeatAt = heartbeatInterval;         // seconds
+        MessageIPC heartBeatMsg = new() { type = "heartbeat" }; // reuse object
 
         try
         {
@@ -188,8 +189,8 @@ public sealed class NamedPipeClientIPC : MonoBehaviour
                 // heart-beat
                 if (stopwatch.Elapsed.TotalSeconds >= nextBeatAt)
                 {
-                    MessageIPC msg = new() { type = "heartbeat", value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") };
-                    await writer.WriteLineAsync(JsonUtility.ToJson(msg)).ConfigureAwait(false);
+                    heartBeatMsg.value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    await writer.WriteLineAsync(JsonUtility.ToJson(heartBeatMsg)).ConfigureAwait(false);
                     // Log($"Sent hb");
                     nextBeatAt += heartbeatInterval;
                 }
