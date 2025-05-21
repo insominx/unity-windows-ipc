@@ -32,8 +32,10 @@ public class MergePlotProxy : MonoBehaviour
         hideWindowButton.onClick.AddListener(SendHideWindowCommand);
 
         NamedPipeClientIPC.OnDataReceived += OnMessageReceived;
-        if (!launchProcess || string.IsNullOrWhiteSpace(processToLaunch)) return;
-        StartProcess(processToLaunch);
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        if (launchProcess && !string.IsNullOrWhiteSpace(processToLaunch))
+            StartProcess(processToLaunch);
+#endif
     }
 
     //---------------------------------------------------------------------------
