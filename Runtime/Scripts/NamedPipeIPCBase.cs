@@ -14,15 +14,16 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     public static event DataReceived OnDataReceived;
 
     protected const int MaxPayloadBytes = 4096;
-
     protected readonly ConcurrentQueue<string> sendQueue = new();
     protected SynchronizationContext unityContext;
 
+    //---------------------------------------------------------------------------
     protected virtual void Awake()
     {
         unityContext = SynchronizationContext.Current;
     }
 
+    //---------------------------------------------------------------------------
     protected bool EnqueueMessage(string message)
     {
         if (string.IsNullOrEmpty(message))
@@ -39,6 +40,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         return true;
     }
 
+    //---------------------------------------------------------------------------
     protected void RaiseDataReceived(string data)
     {
         if (OnDataReceived == null) return;
@@ -56,6 +58,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
             InvokeEvent();
     }
 
+    //---------------------------------------------------------------------------
     protected void Post(SendOrPostCallback cb)
     {
         if (unityContext != null)
@@ -64,9 +67,12 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
             cb(null);
     }
 
+    //---------------------------------------------------------------------------
     protected virtual void Log(string msg) =>
         Post(_ => { if (Application.isPlaying) Debug.Log(msg); });
 
+
+    //---------------------------------------------------------------------------
     protected virtual void LogError(string msg) =>
         Post(_ => { if (Application.isPlaying) Debug.LogError(msg); });
 }

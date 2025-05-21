@@ -46,6 +46,7 @@ public class HumanaMachinaProxy : MonoBehaviour
         StartCoroutine(HideThenShow());
     }
 
+    //---------------------------------------------------------------------------
     IEnumerator HideThenShow()
     {
     #if UNITY_EDITOR

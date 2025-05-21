@@ -19,6 +19,7 @@ public class WindowController
 
     public IntPtr WindowHandle { get; }
 
+    //---------------------------------------------------------------------------
     public WindowController(IntPtr? forcedHwnd = null)
     {
         if (IsInEditor()) return;
@@ -27,14 +28,17 @@ public class WindowController
             Debug.LogError("[WindowController] Failed to get window handle!");
     }
 
+    //---------------------------------------------------------------------------
     bool ValidHandle => WindowHandle != IntPtr.Zero && IsWindow(WindowHandle);
 
+    //---------------------------------------------------------------------------
     public void Hide()
     {
         if (IsInEditor() || !ValidHandle) return;
         ShowWindow(WindowHandle, SW_HIDE);
     }
 
+    //---------------------------------------------------------------------------
     public void Show(bool restore = true)
     {
         if (IsInEditor() || !ValidHandle) return;
@@ -59,6 +63,7 @@ public class WindowController
         AttachThreadInput(myThread, fgThread, false);
     }
 
+    //---------------------------------------------------------------------------
     bool IsInEditor()
     {
     #if UNITY_EDITOR

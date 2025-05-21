@@ -4,7 +4,6 @@ using System.IO.Pipes;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using System.Buffers;
 using UnityEngine;
 
@@ -24,20 +23,22 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
     Task pipeTask;
     int shutdownFlag;
 
-    public bool Send(string message)
-    {
-        return EnqueueMessage(message);
-    }
+    public bool Send(string message) => EnqueueMessage(message);
 
+    //---------------------------------------------------------------------------
     void Start()
     {
         cancelSource = new CancellationTokenSource();
         pipeTask = Task.Run(() => RunPipeServerAsync(cancelSource.Token));
     }
 
+    //---------------------------------------------------------------------------
     void OnApplicationQuit() => Shutdown();
+
+    //---------------------------------------------------------------------------
     void OnDestroy() => Shutdown();
 
+    //---------------------------------------------------------------------------
     void Shutdown()
     {
         if (Interlocked.Exchange(ref shutdownFlag, 1) != 0) return;
@@ -48,6 +49,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         cancelSource = null;
     }
 
+    //---------------------------------------------------------------------------
     async Task RunPipeServerAsync(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
@@ -91,6 +93,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         Log("Pipe server loop terminated.");
     }
 
+    //---------------------------------------------------------------------------
     async Task PipeReaderLoop(PipeStream pipe, CancellationToken token)
     {
         using var reg = token.Register(() =>
@@ -128,6 +131,7 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         }
     }
 
+    //---------------------------------------------------------------------------
     async Task PipeWriterLoop(PipeStream pipe, CancellationToken token)
     {
         // The writer now owns the pipe until the outer "using var server" in RunPipeServerAsync disposes it.
@@ -166,13 +170,14 @@ public class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         // no finally-dispose of 'pipe' here—outer RunPipeServerAsync still has the using-block that will clean it up
     }
 
-
+    //---------------------------------------------------------------------------
     protected override void Log(string msg)
     {
         if (!verbose) return;
         base.Log(msg);
     }
 
+    //---------------------------------------------------------------------------
     protected override void LogError(string msg)
     {
         base.LogError(msg);
