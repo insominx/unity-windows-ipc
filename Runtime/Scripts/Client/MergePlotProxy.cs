@@ -42,6 +42,7 @@ public class MergePlotProxy : MonoBehaviour
         sendDataButton.onClick.RemoveListener(SendSampleData);
         showWindowButton.onClick.RemoveListener(SendShowWindowCommand);
         hideWindowButton.onClick.RemoveListener(SendHideWindowCommand);
+        NamedPipeClientIPC.OnDataReceived -= OnMessageReceived;
     }
 
     //---------------------------------------------------------------------------
