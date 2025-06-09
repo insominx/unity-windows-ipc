@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(MergePlotProxy))]
+[CustomEditor(typeof(MergePlotIpcBridge))]
 public class MergePlotProxyEditor : Editor
 {
     SerializedProperty _processProp;
@@ -19,13 +19,13 @@ public class MergePlotProxyEditor : Editor
     {
         serializedObject.Update();
 
-        DrawPropertiesExcluding(serializedObject, "processToLaunch");
+        DrawPropertiesExcluding(serializedObject, "processToLaunch", "launchProcess");
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("HM Proxy Executable", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Example Serer Executable", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(_launchProp, new GUIContent("Launch On Start"));
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.PropertyField(_processProp, new GUIContent("Process To Launch"));
+        _processProp.stringValue = EditorGUILayout.TextField("Process To Launch", _processProp.stringValue);
 
         if (GUILayout.Button("Browse", GUILayout.Width(60)))
         {
@@ -34,11 +34,11 @@ public class MergePlotProxyEditor : Editor
             {
                 _processProp.stringValue = path;
                 // Prevent layout-mismatch errors caused by the native dialog
+                serializedObject.ApplyModifiedProperties();
                 GUIUtility.ExitGUI();
             }
         }
         EditorGUILayout.EndHorizontal();
-
         serializedObject.ApplyModifiedProperties();
     }
 }
