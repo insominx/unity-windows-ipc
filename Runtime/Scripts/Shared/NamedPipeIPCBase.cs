@@ -20,6 +20,9 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     public delegate void DataReceived(string json);
     public static event DataReceived OnDataReceived;
 
+    public delegate void ConnectionEvent();
+    public static event ConnectionEvent OnConnected;
+
     protected const int  MaxPayloadBytes = 4096;
     protected readonly ConcurrentQueue<string> sendQueue = new();
 
@@ -95,6 +98,8 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     async Task HandleConnectionAsync(PipeStream pipe, CancellationToken tok)
     {
         using var reg = tok.Register(() => { try { pipe.Dispose(); } catch { } });
+
+        RaiseConnected();
 
         var reader = ReaderLoopAsync(pipe, tok);
         var writer = WriterLoopAsync(pipe, tok);
@@ -195,6 +200,15 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         if (OnDataReceived == null) return;
 
         void Invoke() { try { OnDataReceived?.Invoke(data); } catch (Exception ex) { Debug.LogException(ex); } }
+
+        if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null); else Invoke();
+    }
+
+    void RaiseConnected()
+    {
+        if (OnConnected == null) return;
+
+        void Invoke() { try { OnConnected?.Invoke(); } catch (Exception ex) { Debug.LogException(ex); } }
 
         if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null); else Invoke();
     }

@@ -19,6 +19,7 @@ public class ServerClientIpcBridge : MonoBehaviour
         windowController = new WindowController();
         hideWindowButton.onClick.AddListener(OnHideWindowClicked);
         NamedPipeServerIPC.OnDataReceived += OnMessageReceived;
+        NamedPipeServerIPC.OnConnected    += OnPipeConnected;
     }
 
     //---------------------------------------------------------------------------
@@ -26,6 +27,7 @@ public class ServerClientIpcBridge : MonoBehaviour
     {
         hideWindowButton.onClick.RemoveListener(OnHideWindowClicked);
         NamedPipeServerIPC.OnDataReceived -= OnMessageReceived;
+        NamedPipeServerIPC.OnConnected    -= OnPipeConnected;
     }
 
     //---------------------------------------------------------------------------
@@ -98,5 +100,11 @@ public class ServerClientIpcBridge : MonoBehaviour
 
         if (logReceivedData)
             Debug.Log(JsonUtility.ToJson(msg));
+    }
+
+    //--------------------------------------------------------------------------
+    void OnPipeConnected()
+    {
+        Debug.Log("[Server] Pipe connected.");
     }
 }

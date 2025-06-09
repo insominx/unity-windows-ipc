@@ -24,6 +24,7 @@ public class ClientServerIpcBridge : MonoBehaviour
     void Start()
     {
         NamedPipeClientIPC.OnDataReceived += OnMessageReceived;
+        NamedPipeClientIPC.OnConnected    += OnPipeConnected;
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         if (launchProcess && !string.IsNullOrWhiteSpace(processToLaunch))
@@ -35,6 +36,7 @@ public class ClientServerIpcBridge : MonoBehaviour
     void OnDestroy()
     {
         NamedPipeClientIPC.OnDataReceived -= OnMessageReceived;
+        NamedPipeClientIPC.OnConnected    -= OnPipeConnected;
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         processController.Stop();
@@ -121,5 +123,11 @@ public class ClientServerIpcBridge : MonoBehaviour
 #else
         Debug.LogWarning("Process control is only supported on Windows.");
 #endif
+    }
+
+    //--------------------------------------------------------------------------
+    void OnPipeConnected()
+    {
+        Debug.Log("[Client] Pipe connected.");
     }
 }
