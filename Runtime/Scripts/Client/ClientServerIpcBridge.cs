@@ -1,20 +1,14 @@
 using UnityEngine;
-using UnityEngine.UI;
-using System.Diagnostics;
-using System.IO;
 using Debug = UnityEngine.Debug;
 
 #if UNITY_EDITOR
 using UnityEditor; // Editor file picker
 #endif
 
-public class MergePlotIpcBridge : MonoBehaviour
+public class ClientServerIpcBridge : MonoBehaviour
 {
     [Header("References")]
     public NamedPipeClientIPC pipe;
-    public Button sendDataButton;
-    public Button showWindowButton;
-    public Button hideWindowButton;
 
     // Handled by custom editor
     public bool launchProcess;
@@ -24,27 +18,27 @@ public class MergePlotIpcBridge : MonoBehaviour
     public bool logHeartbeats;
     public bool logReceivedData;
 
+    readonly ProcessController processController = new();
+
     //---------------------------------------------------------------------------
     void Start()
     {
-        sendDataButton.onClick.AddListener(SendSampleData);
-        showWindowButton.onClick.AddListener(SendShowWindowCommand);
-        hideWindowButton.onClick.AddListener(SendHideWindowCommand);
-
         NamedPipeClientIPC.OnDataReceived += OnMessageReceived;
+
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         if (launchProcess && !string.IsNullOrWhiteSpace(processToLaunch))
-            StartProcess(processToLaunch);
+            processController.Launch(processToLaunch);
 #endif
     }
 
     //---------------------------------------------------------------------------
     void OnDestroy()
     {
-        sendDataButton.onClick.RemoveListener(SendSampleData);
-        showWindowButton.onClick.RemoveListener(SendShowWindowCommand);
-        hideWindowButton.onClick.RemoveListener(SendHideWindowCommand);
         NamedPipeClientIPC.OnDataReceived -= OnMessageReceived;
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        processController.Stop();
+#endif
     }
 
     //---------------------------------------------------------------------------
@@ -63,7 +57,7 @@ public class MergePlotIpcBridge : MonoBehaviour
             if (msg != null)
                 ProcessMessage(msg);
         }
-        catch {}
+        catch { }
     }
 
     //---------------------------------------------------------------------------
@@ -83,52 +77,49 @@ public class MergePlotIpcBridge : MonoBehaviour
     }
 
     //---------------------------------------------------------------------------
-    void SendSampleData()
+    public void SendData(MessageIPC msg)
     {
-        string customJSON = JsonUtility.ToJson(new MessageIPC { type = "custom", value = "true" });
-        pipe?.Send(customJSON);
+        pipe?.Send(JsonUtility.ToJson(msg));
     }
 
     //---------------------------------------------------------------------------
-    void SendShowWindowCommand()
+    public void SendSampleData()
     {
-        string showJSON = JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "true" });
-        Debug.Log($"Sending: {showJSON}");
-        pipe?.Send(showJSON);
+        pipe?.Send(JsonUtility.ToJson(new MessageIPC { type = "custom", value = "true" }));
     }
 
     //---------------------------------------------------------------------------
-    void SendHideWindowCommand()
+    public void SendShowWindowCommand()
     {
-        string showJSON = JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "false" });
-        Debug.Log($"Sending: {showJSON}");
-        pipe?.Send(showJSON);
+        pipe?.Send(JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "true" }));
     }
 
+    //---------------------------------------------------------------------------
+    public void SendHideWindowCommand()
+    {
+        pipe?.Send(JsonUtility.ToJson(new MessageIPC { type = "show-window", value = "false" }));
+    }
+
+    //---------------------------------------------------------------------------
+    /// <summary>Launches an executable via the ProcessController.
+    /// This is only intended to be used for testing</summary>
+    public void LaunchProcess(string exePath)
+    {
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
-    //---------------------------------------------------------------------------
-    static void StartProcess(string exePath, string arguments = "")
-    {
-        if (string.IsNullOrWhiteSpace(exePath)) return;
-
-        string dir = Path.GetDirectoryName(exePath);
-        if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir)) return;
-        if (!File.Exists(exePath))
-        {
-            Debug.LogError($"Cannot find: {exePath}");
-            return;
-        }
-
-        var info = new ProcessStartInfo
-        {
-            FileName         = exePath,
-            Arguments        = arguments,
-            WorkingDirectory = dir,
-            UseShellExecute  = false,
-            CreateNoWindow   = false
-        };
-
-        Process.Start(info);
-    }
+        processController.Launch(exePath);
+#else
+        Debug.LogWarning("Process launch is only supported on Windows.");
 #endif
+    }
+
+    //---------------------------------------------------------------------------
+    /// <summary>Stops the process launched by this bridge, if any.</summary>
+    public void StopProcess()
+    {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        processController.Stop();
+#else
+        Debug.LogWarning("Process control is only supported on Windows.");
+#endif
+    }
 }
