@@ -1,8 +1,8 @@
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(MergePlotIpcBridge))]
-public class MergePlotProxyEditor : Editor
+[CustomEditor(typeof(ClientServerIpcBridge))]
+public class ClientServerIpcBridgeEditor : Editor
 {
     SerializedProperty _processProp;
     SerializedProperty _launchProp;

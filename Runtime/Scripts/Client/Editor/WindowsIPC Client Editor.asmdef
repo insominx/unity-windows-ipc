@@ -2,7 +2,7 @@
     "name": "WindowsIPCClientEditor",
     "rootNamespace": "",
     "references": [
-        "GUID:66283559dcfa278419e02e5dad948494"
+        "GUID:be040d0a73ec9c549b1df6f6296a49cc"
     ],
     "includePlatforms": [
         "Editor"
