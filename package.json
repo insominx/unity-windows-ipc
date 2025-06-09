@@ -4,6 +4,7 @@
   "displayName": "Windows IPC",
   "description": "Windows NamedPipes for interprocess communication",
   "unity": "2022.3",
+  "author": "Michael Guerrero",
   "dependencies": {},
   "samples": [
     {
