@@ -1,13 +1,13 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-public class HumanaMachinaIpcBridge : MonoBehaviour
+public class ServerClientIpcBridge : MonoBehaviour
 {
     [Header("References")]
     public Button hideWindowButton;
 
     [Header("Config")]
-    WindowController _windowCtrl;
+    WindowController windowController;
 
     [Header("Debug")]
     public bool logHeartbeats;
@@ -16,7 +16,7 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
     //---------------------------------------------------------------------------
     void Awake()
     {
-        _windowCtrl = new WindowController();
+        windowController = new WindowController();
         hideWindowButton.onClick.AddListener(OnHideWindowClicked);
         NamedPipeServerIPC.OnDataReceived += OnMessageReceived;
     }
@@ -54,12 +54,12 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
     #endif
 
         // Debug.Log("[HMProxy] Hiding…");
-        _windowCtrl.Hide();
+        windowController.Hide();
 
         yield return new WaitForSecondsRealtime(1f);
 
         // Debug.Log("[HMProxy] Showing…");
-        _windowCtrl.Show();
+        windowController.Show();
     }
 
     //---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
     #endif
 
         // Debug.Log("[HMProxy] Hiding…");
-        _windowCtrl.Hide();
+        windowController.Hide();
     }
 
     //---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
                 if (!visible)
                     Hide();
                 else
-                    _windowCtrl.Show();
+                    windowController.Show();
             }
         }
 

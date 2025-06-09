@@ -217,12 +217,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 714646135}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d916a1c4ebd0edb4fbc8705c95d6f847, type: 3}
+  m_Script: {fileID: 11500000, guid: 9b6c44b16d8d8b943a2a330101989f69, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hideWindowButton: {fileID: 1431124934}
-  logHeartbeats: 1
-  logReceivedData: 1
+  hideWindowButton: {fileID: 0}
+  logHeartbeats: 0
+  logReceivedData: 0
 --- !u!4 &714646137
 Transform:
   m_ObjectHideFlags: 0
@@ -247,12 +247,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 714646135}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9226d5377f88b0e4a93eb846bedef9e0, type: 3}
+  m_Script: {fileID: 11500000, guid: d025dd03e7de5dc4096263b1491a83f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   pipeName: UnityPipe
   heartbeatSecs: 1
-  verbose: 1
+  verbose: 0
 --- !u!1 &758241830
 GameObject:
   m_ObjectHideFlags: 0

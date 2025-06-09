@@ -76,7 +76,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
                 LogVerbose("RunAsync cancelled.");
                 break;
             }
-            catch (TimeoutException) {                               // Expected – server absent
+            catch (TimeoutException) {                               // Expected – server absent
                 LogVerbose("Connect timed out – retrying…");
             }
             catch (IOException ioEx) {                               // Expected when other side leaves
