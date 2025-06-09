@@ -19,6 +19,7 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
         _windowCtrl = new WindowController();
         hideWindowButton.onClick.AddListener(OnHideWindowClicked);
         NamedPipeServerIPC.OnDataReceived += OnMessageReceived;
+        NamedPipeServerIPC.OnConnected    += OnPipeConnected;
     }
 
     //---------------------------------------------------------------------------
@@ -26,6 +27,7 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
     {
         hideWindowButton.onClick.RemoveListener(OnHideWindowClicked);
         NamedPipeServerIPC.OnDataReceived -= OnMessageReceived;
+        NamedPipeServerIPC.OnConnected    -= OnPipeConnected;
     }
 
     //---------------------------------------------------------------------------
@@ -98,5 +100,11 @@ public class HumanaMachinaIpcBridge : MonoBehaviour
 
         if (logReceivedData)
             Debug.Log(JsonUtility.ToJson(msg));
+    }
+
+    //--------------------------------------------------------------------------
+    void OnPipeConnected()
+    {
+        Debug.Log("[Server] Pipe connected.");
     }
 }
