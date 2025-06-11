@@ -23,20 +23,21 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     public delegate void ConnectionEvent();
     public static event ConnectionEvent OnConnected;
 
-    protected const int  MaxPayloadBytes = 4096;
+    protected const int MaxPayloadBytes = 4096;
     protected readonly ConcurrentQueue<string> sendQueue = new();
 
     [Header("Pipe Settings")]
-    [SerializeField] protected string pipeName      = "UnityPipe";
-    [SerializeField] protected float  heartbeatSecs = 1f;
-    [SerializeField] protected bool   verbose;                  // toggle chatty logs
+    [SerializeField] protected string pipeName = "UnityPipe";
+    [SerializeField] protected float heartbeatSecs = 1f;
+    [SerializeField] protected bool verbose; // toggle chatty logs
 
     CancellationTokenSource _cts;
     Task _loopTask;
-    int  _shutdownFlag;
+    int _shutdownFlag;
 
     SynchronizationContext _unityCtx;
     static readonly Stopwatch _timer = Stopwatch.StartNew();
+    static readonly UTF8Encoding Utf8NoBom = new(false); // UTF‑8 with NO BOM
 
     // ───────────────── Unity lifecycle ─────────────────
     protected virtual void Awake() => _unityCtx = SynchronizationContext.Current;
@@ -44,11 +45,11 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     protected virtual void Start()
     {
         Log($"[{typeof(T).Name}] Start()");
-        _cts      = new CancellationTokenSource();
+        _cts = new CancellationTokenSource();
         _loopTask = Task.Run(() => RunAsync(_cts.Token));
     }
 
-    void OnApplicationQuit()   => Shutdown();
+    void OnApplicationQuit() => Shutdown();
     protected virtual void OnDestroy() => Shutdown();
 
     // ───────────────── Template method ─────────────────
@@ -75,17 +76,21 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
 
                 await HandleConnectionAsync(pipe, tok).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) {                     // Shutdown / domain reload
+            catch (OperationCanceledException)
+            { // Shutdown / domain reload
                 LogVerbose("RunAsync cancelled.");
                 break;
             }
-            catch (TimeoutException) {                               // Expected – server absent
+            catch (TimeoutException)
+            { // Expected – server absent
                 LogVerbose("Connect timed out – retrying…");
             }
-            catch (IOException ioEx) {                               // Expected when other side leaves
+            catch (IOException ioEx)
+            { // Expected when other side leaves
                 LogVerbose($"Pipe I/O closed: {ioEx.Message} – retrying…");
             }
-            catch (Exception ex) {                                   // Anything else is real trouble
+            catch (Exception ex)
+            { // Anything else is real trouble
                 LogError($"RunAsync unexpected error: {ex}");
             }
 
@@ -97,7 +102,11 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
 
     async Task HandleConnectionAsync(PipeStream pipe, CancellationToken tok)
     {
-        using var reg = tok.Register(() => { try { pipe.Dispose(); } catch { } });
+        using var reg = tok.Register(() =>
+        {
+            try { pipe.Dispose(); }
+            catch { }
+        });
 
         RaiseConnected();
 
@@ -105,7 +114,8 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         var writer = WriterLoopAsync(pipe, tok);
 
         await Task.WhenAny(reader, writer).ConfigureAwait(false);
-        try { await Task.WhenAll(reader, writer).ConfigureAwait(false); } catch { }
+        try { await Task.WhenAll(reader, writer).ConfigureAwait(false); }
+        catch { }
 
         // Flush orphaned messages so the next connection starts clean
         while (sendQueue.TryDequeue(out _)) { }
@@ -127,44 +137,49 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
                 do
                 {
                     int n = await pipe.ReadAsync(buf, total, buf.Length - total, tok)
-                                      .ConfigureAwait(false);
-                    if (n == 0) return;                           // remote closed
+                        .ConfigureAwait(false);
+                    if (n == 0) return; // remote closed
                     total += n;
                 }
                 while (!pipe.IsMessageComplete);
 
                 string payload = Encoding.UTF8.GetString(buf, 0, total);
-                LogVerbose($"Reader got {total} B: {payload}");
+                LogVerbose($"Reader got {total}B: {payload}");
                 RaiseDataReceived(payload);
             }
         }
         catch (OperationCanceledException) { }
-        catch (IOException)                { }                    // normal on disconnect
-        catch (Exception ex)               { LogError($"ReaderLoop error: {ex}"); }
+        catch (IOException) { } // normal on disconnect
+        catch (Exception ex) { LogError($"ReaderLoop error: {ex}"); }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Replace the whole WriterLoopAsync method with this version
     async Task WriterLoopAsync(PipeStream pipe, CancellationToken tok)
     {
-        await using var writer =
-            new StreamWriter(pipe, Encoding.UTF8, 1024, leaveOpen: true) { AutoFlush = true };
-
         double nextBeat = _timer.Elapsed.TotalSeconds + heartbeatSecs;
-        var    hb       = new MessageIPC { type = "heartbeat" };
+        var hb = new MessageIPC { type = "heartbeat" };
 
         try
         {
             while (!tok.IsCancellationRequested && pipe.IsConnected)
             {
+                // ─────────────── pump user messages ───────────────
                 while (sendQueue.TryDequeue(out string msg))
                 {
-                    await writer.WriteLineAsync(msg).ConfigureAwait(false);
+                    byte[] bytes = Utf8NoBom.GetBytes(msg); // one message, one write
+                    await pipe.WriteAsync(bytes, 0, bytes.Length, tok).ConfigureAwait(false);
+                    await pipe.FlushAsync(tok).ConfigureAwait(false);
                     LogVerbose($"Writer sent user msg: {msg}");
                 }
 
+                // ─────────────── heartbeat ───────────────
                 if (_timer.Elapsed.TotalSeconds >= nextBeat)
                 {
                     hb.value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    await writer.WriteLineAsync(JsonUtility.ToJson(hb)).ConfigureAwait(false);
+                    byte[] hbBytes = Utf8NoBom.GetBytes(JsonUtility.ToJson(hb));
+                    await pipe.WriteAsync(hbBytes, 0, hbBytes.Length, tok).ConfigureAwait(false);
+                    await pipe.FlushAsync(tok).ConfigureAwait(false);
                     LogVerbose("Writer sent heartbeat.");
                     nextBeat += heartbeatSecs;
                 }
@@ -173,9 +188,9 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
                 catch (OperationCanceledException) { break; }
             }
         }
-        catch (OperationCanceledException) { }
-        catch (IOException)                { }                    // normal on disconnect
-        catch (Exception ex)               { LogError($"WriterLoop error: {ex}"); }
+        catch (OperationCanceledException) { } // shutting down – ignore
+        catch (IOException) { } // normal on disconnect
+        catch (Exception ex) { LogError($"WriterLoop error: {ex}"); }
     }
 
     // ───────────────── Queue & logging helpers ─────────────────
@@ -199,29 +214,48 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
     {
         if (OnDataReceived == null) return;
 
-        void Invoke() { try { OnDataReceived?.Invoke(data); } catch (Exception ex) { Debug.LogException(ex); } }
+        void Invoke()
+        {
+            try { OnDataReceived?.Invoke(data); }
+            catch (Exception ex) { Debug.LogException(ex); }
+        }
 
-        if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null); else Invoke();
+        if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null);
+        else Invoke();
     }
 
     void RaiseConnected()
     {
         if (OnConnected == null) return;
 
-        void Invoke() { try { OnConnected?.Invoke(); } catch (Exception ex) { Debug.LogException(ex); } }
+        void Invoke()
+        {
+            try { OnConnected?.Invoke(); }
+            catch (Exception ex) { Debug.LogException(ex); }
+        }
 
-        if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null); else Invoke();
+        if (_unityCtx != null) _unityCtx.Post(_ => Invoke(), null);
+        else Invoke();
     }
 
     // ——— thread‑safe log wrappers ———
-    protected void LogVerbose(string m) { if (verbose) PostLog(m, false); }
-    protected void Log       (string m) { PostLog(m, false);             }
-    protected void LogError  (string m) { PostLog(m, true );             }
+    protected void LogVerbose(string m)
+    {
+        if (verbose) PostLog(m, false);
+    }
+    protected void Log(string m) { PostLog(m, false); }
+    protected void LogError(string m) { PostLog(m, true); }
 
     void PostLog(string msg, bool isErr)
     {
-        void Act(object _) { if (isErr) Debug.LogError(msg); else Debug.Log(msg); }
-        if (_unityCtx != null) _unityCtx.Post(Act, null); else Act(null);
+        void Act(object _)
+        {
+            if (isErr) Debug.LogError(msg);
+            else Debug.Log(msg);
+        }
+
+        if (_unityCtx != null) _unityCtx.Post(Act, null);
+        else Act(null);
     }
 
     // ───────────────── Shutdown ─────────────────
@@ -230,16 +264,21 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         if (Interlocked.Exchange(ref _shutdownFlag, 1) != 0) return;
         Log($"[{typeof(T).Name}] Shutdown()");
 
-        var cts  = _cts;
+        var cts = _cts;
         var loop = _loopTask;
         _cts = null;
         _loopTask = null;
 
-        try { cts?.Cancel(); } catch { }
+        try { cts?.Cancel(); }
+        catch { }
 
         if (loop != null)
-            _ = loop.ContinueWith(_ => { try { cts?.Dispose(); } catch { } },
-                                  TaskScheduler.Default);
+            _ = loop.ContinueWith(_ =>
+                {
+                    try { cts?.Dispose(); }
+                    catch { }
+                },
+                TaskScheduler.Default);
         else
             cts?.Dispose();
     }

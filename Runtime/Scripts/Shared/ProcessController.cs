@@ -14,6 +14,10 @@ public class ProcessController
     // Launches an external executable.
     public void Launch(string exePath, string arguments = "")
     {
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN
+        Debug.LogWarning("Process launch is only supported on Windows.");
+#endif
+
         if (string.IsNullOrWhiteSpace(exePath))
         {
             Debug.LogError("ProcessController: empty executable path.");
@@ -55,6 +59,10 @@ public class ProcessController
     /// </summary>
     public void Stop()
     {
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN
+        Debug.LogWarning("Process stop is only supported on Windows.");
+#endif
+
         if (_process == null)
             return;
 

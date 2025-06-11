@@ -1,4 +1,3 @@
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
 using System;
 using System.IO;
 using System.IO.Pipes;
@@ -43,4 +42,3 @@ public sealed class NamedPipeClientIPC : NamedPipeIPCBase<NamedPipeClientIPC>
         throw new OperationCanceledException(tok);
     }
 }
-#endif
