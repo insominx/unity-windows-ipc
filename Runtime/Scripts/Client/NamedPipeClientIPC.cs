@@ -4,6 +4,7 @@ using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 /// <summary>
 /// Named‑pipe **client** that keeps retrying every second until a server appears.
 /// </summary>
