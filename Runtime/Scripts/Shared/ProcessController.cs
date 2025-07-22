@@ -5,6 +5,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 public class ProcessController
@@ -19,6 +20,15 @@ public class ProcessController
             Debug.LogError("ProcessController: empty executable path.");
             return;
         }
+
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN && !UNITY_WSA
+        // Warn on non-Windows platforms since this is typically used for Windows executables
+        if (exePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.LogWarning("ProcessController: Attempting to launch .exe file on non-Windows platform. This will likely fail.");
+        }
+        Debug.LogWarning("ProcessController: Process launching is primarily designed for Windows. Cross-platform compatibility may vary.");
+#endif
 
         string dir = Path.GetDirectoryName(exePath);
         if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir) || !File.Exists(exePath))
@@ -47,6 +57,9 @@ public class ProcessController
         catch (Exception ex)
         {
             Debug.LogError($"ProcessController: Failed to launch process: {ex.Message}");
+#if !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN && !UNITY_WSA
+            Debug.LogError("ProcessController: Process launching may not be supported on this platform or the executable format may be incompatible.");
+#endif
         }
     }
 

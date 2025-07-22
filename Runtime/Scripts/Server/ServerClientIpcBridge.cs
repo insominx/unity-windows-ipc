@@ -51,9 +51,11 @@ public class ServerClientIpcBridge : MonoBehaviour
     //---------------------------------------------------------------------------
     IEnumerator HideThenShow()
     {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
         Debug.LogWarning("No-op in Editor.");
-    #endif
+#elif !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN && !UNITY_WSA
+        Debug.LogWarning("Window control is only supported on Windows platforms.");
+#endif
 
         // Debug.Log("[HMProxy] Hiding…");
         windowController.Hide();
@@ -67,9 +69,11 @@ public class ServerClientIpcBridge : MonoBehaviour
     //---------------------------------------------------------------------------
     void Hide()
     {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
         Debug.LogWarning("No-op in Editor.");
-    #endif
+#elif !UNITY_STANDALONE_WIN && !UNITY_EDITOR_WIN && !UNITY_WSA
+        Debug.LogWarning("Window control is only supported on Windows platforms.");
+#endif
 
         // Debug.Log("[HMProxy] Hiding…");
         windowController.Hide();

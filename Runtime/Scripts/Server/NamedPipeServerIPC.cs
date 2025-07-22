@@ -24,4 +24,19 @@ public sealed class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
         return server;
     }
 }
+#else
+using System.Threading;
+using System.Threading.Tasks;
+
+/// <summary>
+/// Named‑pipe **server** – no-op implementation for non-Windows platforms.
+/// </summary>
+public sealed class NamedPipeServerIPC : NamedPipeIPCBase<NamedPipeServerIPC>
+{
+    protected override Task ConnectAsync(CancellationToken tok)
+    {
+        LogVerbose("[Server] Named pipes not supported on this platform.");
+        return Task.FromException(new System.PlatformNotSupportedException("Named pipes are only supported on Windows platforms"));
+    }
+}
 #endif
