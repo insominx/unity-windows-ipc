@@ -1,10 +1,13 @@
 using System;
 using System.Diagnostics;
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
 using System.Runtime.InteropServices;
+#endif
 using Debug = UnityEngine.Debug;
 
 public class WindowController
 {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
     const int SW_HIDE    = 0;
     const int SW_RESTORE = 9;
 
@@ -72,4 +75,26 @@ public class WindowController
         return false;
     #endif
     }
+#else
+    // Non-Windows implementation - no-op
+    public IntPtr WindowHandle => IntPtr.Zero;
+
+    //---------------------------------------------------------------------------
+    public WindowController(IntPtr? forcedHwnd = null)
+    {
+        Debug.LogWarning("[WindowController] Window control is only supported on Windows platforms.");
+    }
+
+    //---------------------------------------------------------------------------
+    public void Hide()
+    {
+        Debug.LogWarning("[WindowController] Hide() - Window control not supported on this platform.");
+    }
+
+    //---------------------------------------------------------------------------
+    public void Show(bool restore = true)
+    {
+        Debug.LogWarning("[WindowController] Show() - Window control not supported on this platform.");
+    }
+#endif
 }

@@ -2,7 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
 using System.IO.Pipes;
+#endif
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +14,7 @@ using Debug = UnityEngine.Debug;
 /// <summary>
 /// Common machinery for both client & server named‑pipe endpoints.
 /// Keeps retrying on *expected* failures (timeout, pipe closed) without
-/// throwing red errors.  All logs are marshalled to Unity’s main thread.
+/// throwing red errors.  All logs are marshalled to Unity's main thread.
 /// </summary>
 public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPCBase<T>
 {
@@ -44,25 +46,41 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
 
     protected virtual void Start()
     {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
         Log($"[{typeof(T).Name}] Start()");
         _cts = new CancellationTokenSource();
         _loopTask = Task.Run(() => RunAsync(_cts.Token));
+#else
+        Log($"[{typeof(T).Name}] Start() - Named pipes not supported on this platform");
+#endif
     }
 
     void OnApplicationQuit() => Shutdown();
     protected virtual void OnDestroy() => Shutdown();
 
-    // ───────────────── Template method ─────────────────
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
+    // ───────────────── Template method (Windows) ─────────────────
     /// <remarks>
     ///  Must return a *connected* <see cref="PipeStream"/>.
     ///  Throw <see cref="OperationCanceledException"/> to propagate cancellation.
     /// </remarks>
     protected abstract Task<PipeStream> ConnectAsync(CancellationToken tok);
+#else
+    // ───────────────── Template method (Non-Windows) ─────────────────
+    /// <remarks>
+    ///  No-op implementation for non-Windows platforms.
+    /// </remarks>
+    protected virtual Task ConnectAsync(CancellationToken tok)
+    {
+        return Task.FromException(new PlatformNotSupportedException("Named pipes are only supported on Windows platforms"));
+    }
+#endif
 
     // ───────────────── Public API ─────────────────
     public bool Send(string json) => EnqueueMessage(json);
 
-    // ───────────────── Core loop ─────────────────
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
+    // ───────────────── Core loop (Windows) ─────────────────
     async Task RunAsync(CancellationToken tok)
     {
         Log($"[{typeof(T).Name}] RunAsync loop started.");
@@ -81,13 +99,11 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
                 LogVerbose("RunAsync cancelled.");
                 break;
             }
-            catch (TimeoutException)
-            { // Expected – server absent
-                LogVerbose("Connect timed out – retrying…");
+            catch (TimeoutException) {                               // Expected – server absent
+                LogVerbose("Connect timed out – retrying…");
             }
-            catch (IOException ioEx)
-            { // Expected when other side leaves
-                LogVerbose($"Pipe I/O closed: {ioEx.Message} – retrying…");
+            catch (IOException ioEx) {                               // Expected when other side leaves
+                LogVerbose($"Pipe I/O closed: {ioEx.Message} – retrying…");
             }
             catch (Exception ex)
             { // Anything else is real trouble
@@ -123,7 +139,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         LogVerbose($"[{typeof(T).Name}] Pipe disconnected, will retry.");
     }
 
-    // ───────────────── Reader & Writer loops ─────────────────
+    // ───────────────── Reader & Writer loops (Windows) ─────────────────
     async Task ReaderLoopAsync(PipeStream pipe, CancellationToken tok)
     {
         const int CHUNK = 8192;
@@ -144,7 +160,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
                 while (!pipe.IsMessageComplete);
 
                 string payload = Encoding.UTF8.GetString(buf, 0, total);
-                LogVerbose($"Reader got {total}B: {payload}");
+                LogVerbose($"Reader got {total} B: {payload}");
                 RaiseDataReceived(payload);
             }
         }
@@ -192,6 +208,7 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         catch (IOException) { } // normal on disconnect
         catch (Exception ex) { LogError($"WriterLoop error: {ex}"); }
     }
+#endif
 
     // ───────────────── Queue & logging helpers ─────────────────
     protected bool EnqueueMessage(string msg)
@@ -201,13 +218,18 @@ public abstract class NamedPipeIPCBase<T> : MonoBehaviour where T : NamedPipeIPC
         int bytes = Encoding.UTF8.GetByteCount(msg);
         if (bytes > MaxPayloadBytes)
         {
-            LogError($"Payload {bytes} B exceeds 4 KB limit – rejected.");
+            LogError($"Payload {bytes} B exceeds 4 KB limit – rejected.");
             return false;
         }
 
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN || UNITY_WSA
         sendQueue.Enqueue(msg);
         LogVerbose($"Enqueued message: {msg}");
         return true;
+#else
+        LogVerbose($"Message not sent - Named pipes not supported on this platform: {msg}");
+        return false;
+#endif
     }
 
     void RaiseDataReceived(string data)

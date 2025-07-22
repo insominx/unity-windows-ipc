@@ -31,7 +31,7 @@ public sealed class NamedPipeClientIPC : NamedPipeIPCBase<NamedPipeClientIPC>
             catch (IOException ioEx)       { LogVerbose($"[Client] IO on connect: {ioEx.Message}"); }
             finally
             {
-                if (!pipe.IsConnected)      // failed attempt – clean up & retry
+                if (!pipe.IsConnected)      // failed attempt – clean up & retry
                     try { pipe.Dispose(); } catch { }
             }
 
@@ -42,3 +42,19 @@ public sealed class NamedPipeClientIPC : NamedPipeIPCBase<NamedPipeClientIPC>
         throw new OperationCanceledException(tok);
     }
 }
+#else
+using System.Threading;
+using System.Threading.Tasks;
+
+/// <summary>
+/// Named‑pipe **client** – no-op implementation for non-Windows platforms.
+/// </summary>
+public sealed class NamedPipeClientIPC : NamedPipeIPCBase<NamedPipeClientIPC>
+{
+    protected override Task ConnectAsync(CancellationToken tok)
+    {
+        LogVerbose("[Client] Named pipes not supported on this platform.");
+        return Task.FromException(new System.PlatformNotSupportedException("Named pipes are only supported on Windows platforms"));
+    }
+}
+#endif
